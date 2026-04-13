@@ -323,32 +323,39 @@ async function doScan(){
   if(scanning)return;
   scanning=true;results=[];stats={n:0,u:0,c:0};
   document.getElementById('scanBtn').disabled=true;
-  document.getElementById('scanBtn').textContent='Searching...';
+  document.getElementById('scanBtn').textContent='Scanning...';
   document.getElementById('sbar').style.display='flex';
   document.getElementById('rptBtn').disabled=true;
   document.getElementById('fa').style.display='none';
   document.getElementById('feed').innerHTML='';
   setSt('sc');
 
-  var active=getActive();
-  document.getElementById('slog').textContent='Searching '+active.length+' sources in one call...';
-
   try{
-    var items=await searchAll(active,drFrom,drTo);
-    items.forEach(function(it){
-      results.push(it);
+    var response=await fetch('/api/scan',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sites:getActive(),
+        fromDate:drFrom?drFrom.split('-').reverse().join('/'):'',
+        toDate:drTo?drTo.split('-').reverse().join('/'):'',
+      })
+    });
+    if(!response.ok){var err=await response.json();throw new Error(err.error||'HTTP '+response.status);}
+    var data=await response.json();
+    results=data.items||[];
+    results.forEach(function(it){
       if(it.type==='new')stats.n++;
       else if(it.type==='update')stats.u++;
       else stats.c++;
     });
   }catch(e){
-    console.warn('Search failed:',e.message);
-    toast('Search failed: '+e.message);
+    toast('Scan failed: '+e.message);
+    console.error(e);
   }
 
   lastScan=new Date().toISOString();
-  safeSet('mr6r',results);
-  safeSetStr('mr6l',lastScan);
+  safeSet('mr7r',results);
+  safeSetStr('mr7l',lastScan);
   scanning=false;
   updateBtn();
   document.getElementById('scanBtn').disabled=false;
@@ -357,8 +364,7 @@ async function doScan(){
   setSt('rdy');
   updStats();updLS();
   renderFA();renderFeed();
-  var inRange=results.filter(itemInRange).length;
-  toast('Done — '+results.length+' items'+(inRange<results.length?', '+inRange+' in range':''));
+  toast('Done — '+results.length+' items found');
 }
 
 
