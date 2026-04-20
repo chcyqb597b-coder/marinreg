@@ -185,7 +185,7 @@ header{flex-shrink:0;padding:14px 16px 10px;background:#0d1117;border-bottom:1px
 </div>
 
 <div class="screen" id="rscreen" style="display:none">
-  <div class="shead"><button class="bbk" onclick="cls('rscreen')">&#8592; Back</button><span class="stitle">Report</span></div>
+  <div class="shead"><button class="bbk" onclick="cls('rscreen')">&#8592; Back</button><span class="stitle">Report</span><button onclick="downloadPDF()" style="margin-left:auto;background:linear-gradient(135deg,#0066ff,#00d4ff);border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">&#128196; PDF</button></div>
   <div id="rcont"></div>
 </div>
 
@@ -525,6 +525,63 @@ function cls(id){document.getElementById(id).style.display='none';}
 function setSt(s){var b=document.getElementById('sb');b.className='sbadge'+(s==='sc'?' sc':'');document.getElementById('st').textContent=s==='sc'?'Scanning':'Ready';}
 var tt;
 function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(function(){t.classList.remove('show');},4000);}
+
+function downloadPDF(){
+  var rcont = document.getElementById('rcont');
+  if(!rcont || !rcont.innerHTML) return;
+  
+  var printWin = window.open('', '_blank');
+  printWin.document.write('<html><head><title>MarineReg Report</title><style>');
+  printWin.document.write('body{font-family:Arial,sans-serif;margin:20px;color:#0f172a;background:#fff}');
+  printWin.document.write('h1{color:#1e3a5f;font-size:22px;margin-bottom:4px}');
+  printWin.document.write('p{color:#64748b;font-size:11px;margin-bottom:16px}');
+  printWin.document.write('.stats{display:flex;gap:20px;background:#f1f5f9;padding:12px;border-radius:8px;margin-bottom:16px}');
+  printWin.document.write('.sv{font-size:22px;font-weight:800;color:#1e3a5f}.sl{font-size:9px;color:#64748b;text-transform:uppercase}');
+  printWin.document.write('.card{border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:8px;padding:14px;margin-bottom:12px;page-break-inside:avoid}');
+  printWin.document.write('.cmeta{display:flex;justify-content:space-between;margin-bottom:6px;font-size:11px;color:#64748b}');
+  printWin.document.write('.ctitle{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px}');
+  printWin.document.write('.csum{font-size:12px;color:#475569;line-height:1.6;margin-bottom:8px}');
+  printWin.document.write('.tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}');
+  printWin.document.write('.tag{font-size:10px;padding:2px 8px;border-radius:4px;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b}');
+  printWin.document.write('.cdate{font-size:11px;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:8px}');
+  printWin.document.write('.footer{text-align:center;margin-top:20px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px}');
+  printWin.document.write('@media print{.card{page-break-inside:avoid}}');
+  printWin.document.write('</style></head><body>');
+  
+  // Build clean content from results
+  var now = new Date(lastScan||Date.now());
+  var fil = results.filter(function(r){return(tf==='all'||r.type===tf)&&(cf==='All'||r.cat===cf)&&itemInRange(r);});
+  
+  printWin.document.write('<h1>&#9875; MarineReg Report</h1>');
+  printWin.document.write('<p>' + now.toLocaleString('en-GB') + '</p>');
+  printWin.document.write('<div class="stats">');
+  printWin.document.write('<div><div class="sv">' + fil.length + '</div><div class="sl">Total</div></div>');
+  printWin.document.write('<div><div class="sv">' + fil.filter(function(r){return r.type==='new';}).length + '</div><div class="sl">New</div></div>');
+  printWin.document.write('<div><div class="sv">' + fil.filter(function(r){return r.type==='update';}).length + '</div><div class="sl">Updates</div></div>');
+  printWin.document.write('<div><div class="sv">' + fil.filter(function(r){return r.type==='circular';}).length + '</div><div class="sl">Circulars</div></div>');
+  printWin.document.write('</div>');
+  
+  fil.forEach(function(r){
+    var borderColor = r.type==='new'?'#3b82f6':r.type==='update'?'#f59e0b':'#10b981';
+    var badge = r.type==='new'?'NEW':r.type==='update'?'UPDATE':'CIRCULAR';
+    var tags = (r.tags||[]).map(function(t){return '<span class="tag">'+escH(t)+'</span>';}).join('');
+    printWin.document.write('<div class="card" style="border-left-color:'+borderColor+'">');
+    printWin.document.write('<div class="cmeta"><span>'+r.icon+' <strong>'+escH(r.source)+'</strong> &middot; '+r.cat+'</span><span>'+badge+'</span></div>');
+    printWin.document.write('<div class="ctitle">'+escH(r.title)+'</div>');
+    if(r.summary) printWin.document.write('<div class="csum">'+escH(r.summary)+'</div>');
+    if(tags) printWin.document.write('<div class="tags">'+tags+'</div>');
+    printWin.document.write('<div class="cdate">'+r.date+' &middot; <a href="'+escA(r.url)+'">'+escA(r.url)+'</a></div>');
+    printWin.document.write('</div>');
+  });
+  
+  printWin.document.write('<div class="footer">MarineReg &middot; marinreg.vercel.app &middot; ' + now.toLocaleDateString('en-GB') + '</div>');
+  printWin.document.write('</body></html>');
+  printWin.document.close();
+  
+  setTimeout(function(){
+    printWin.print();
+  }, 500);
+}
 
 function init(){
   updWl();updateBtn();
