@@ -15,7 +15,7 @@ Find as many real items as possible. For each item:
 
 Skip sources with nothing new. Do NOT invent items.
 
-Return ONLY valid JSON:
+Return ONLY valid JSON with no markdown, no code blocks, no backticks:
 {"items":[{"type":"new|update|circular","title":"...","summary":"...","tags":["TAG"],"date":"DD/MM/YYYY","source":"Org Name","url":"https://..."}]}`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -57,7 +57,11 @@ Return ONLY valid JSON:
     if (blocks[i].type === 'text' && blocks[i].text) { text = blocks[i].text; break; }
   }
 
+  // Strip markdown code blocks and cite tags
+  text = text.replace(/```json\s*/g, '').replace(/```\s*/g, '');
   text = text.replace(/<cite[^>]*>[\s\S]*?<\/cite>/g, '').replace(/<\/?cite[^>]*>/g, '');
+
+  // Extract JSON object
   let depth = 0, start = -1, found = '';
   for (let ci = 0; ci < text.length; ci++) {
     const ch = text[ci];
@@ -104,14 +108,11 @@ export default async function handler(req, res) {
     ? `published between ${fromDate || 'any'} and ${toDate || 'today'}`
     : 'from the last 30 days';
 
-  // Split sites into 2 groups
   const half = Math.ceil(sites.length / 2);
   const group1 = sites.slice(0, half);
   const group2 = sites.slice(half);
 
   const results = [];
-  
-  // Run 2 searches in parallel
   const [r1, r2] = await Promise.allSettled([
     searchGroup(group1, dateCtx, API_KEY),
     searchGroup(group2, dateCtx, API_KEY)
